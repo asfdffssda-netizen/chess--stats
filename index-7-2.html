@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إحصائيات Chess.com</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&family=Roboto+Mono:wght@500;700&display=swap');
+
+  :root{
+    --board-light: #eae6d6;
+    --ink: #1f2419;
+    --paper: #f6f4ec;
+    --gold: #b5893a;
+    --win: #4a5d3a;
+    --loss: #a5493a;
+    --draw: #b5893a;
+    --line: #d8d3bd;
+  }
+
+  * { box-sizing: border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      linear-gradient(180deg, rgba(31,36,25,0.04), rgba(31,36,25,0.04)),
+      repeating-linear-gradient(45deg, var(--board-light) 0 40px, #e2ddc8 40px 80px);
+    background-color: var(--paper);
+    font-family:'Cairo', sans-serif;
+    color: var(--ink);
+    display:flex;
+    justify-content:center;
+    padding: 32px 16px;
+  }
+
+  .card{
+    width:100%;
+    max-width: 560px;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    box-shadow: 8px 8px 0 rgba(31,36,25,0.15);
+    padding: 32px 28px 28px;
+  }
+
+  .top-row{ display:flex; align-items:center; gap:12px; margin-bottom: 6px; }
+  .pawn{ width: 30px; height:30px; flex-shrink:0; }
+  h1{ font-size: 1.5rem; font-weight:800; margin:0; letter-spacing: -0.01em; }
+  .sub{ color:#5c6650; font-size:0.9rem; margin: 0 0 24px; line-height:1.6; }
+
+  form{ display:flex; gap:8px; margin-bottom: 16px; }
+  input[type=text]{
+    flex:1; font-family:'Cairo', sans-serif; font-size:1rem;
+    padding: 12px 14px; border: 2px solid var(--ink); border-radius: 3px;
+    background: white; color: var(--ink); direction:ltr; text-align:right;
+  }
+  input[type=text]:focus{ outline: 2px solid var(--gold); outline-offset:1px; }
+
+  button{
+    font-family:'Cairo', sans-serif; font-weight:700; font-size:1rem;
+    padding: 12px 20px; background: var(--ink); color: var(--paper);
+    border:none; border-radius: 3px; cursor:pointer; transition: transform 0.08s ease;
+  }
+  button:hover{ background:#33402a; }
+  button:active{ transform: translateY(1px); }
+  button:disabled{ opacity:0.5; cursor:default; }
+
+  .state{ min-height: 20px; font-size:0.88rem; margin-bottom: 8px; line-height:1.6; }
+  .state.error{ color: var(--loss); }
+  .state.loading{ color:#5c6650; }
+
+  .result{ display:none; }
+  .result.show{ display:block; animation: rise 0.35s ease; }
+  @keyframes rise{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .section-title{
+    font-size:0.82rem; color:#8b8770; margin: 26px 0 12px; border-top:1px solid var(--line);
+    padding-top:18px;
+  }
+  .section-title:first-of-type{ margin-top:0; }
+
+  .cards-grid{ display:grid; grid-template-columns: repeat(4,1fr); gap:10px; }
+  .stat-card{ background:#efece0; border-radius:6px; padding:12px 8px; text-align:center; }
+  .stat-card .num{ font-family:'Roboto Mono', monospace; font-weight:700; font-size:1.3rem; display:block; }
+  .stat-card .lbl{ font-size:0.72rem; color:#5c6650; margin-top:4px; display:block; line-height:1.3; }
+  .stat-card.win .num{ color:var(--win); }
+  .stat-card.loss .num{ color:var(--loss); }
+  .stat-card.draw .num{ color:var(--draw); }
+
+  table.modes{ width:100%; border-collapse:collapse; font-size:0.82rem; }
+  table.modes th, table.modes td{ padding:8px 4px; text-align:center; border-bottom:1px solid var(--line); }
+  table.modes th{ color:#5c6650; font-weight:600; font-size:0.75rem; }
+  table.modes td:first-child, table.modes th:first-child{ text-align:right; color:var(--ink); font-weight:600; }
+  table.modes td.wcol{ color:var(--win); font-weight:700; }
+  table.modes td.lcol{ color:var(--loss); font-weight:700; }
+
+  .streaks{ display:grid; gap:10px; }
+  .streak-row{ display:flex; justify-content:space-between; align-items:center; background:#efece0; border-radius:6px; padding:12px 14px; }
+  .streak-row .lbl{ font-size:0.85rem; }
+  .streak-row .num{ font-family:'Roboto Mono', monospace; font-weight:700; font-size:1.1rem; }
+
+  .mode-card{ border:1px solid var(--line); border-radius:8px; padding:16px 14px; margin-bottom:14px; background:#faf9f2; }
+  .mode-card h3{ margin:0 0 12px; font-size:1.05rem; font-weight:800; display:flex; align-items:center; gap:8px; }
+  .mode-card h3 .dot{ width:9px; height:9px; border-radius:50%; background:var(--gold); display:inline-block; }
+  .mini-grid{ display:grid; grid-template-columns: repeat(3,1fr); gap:8px; margin-bottom:8px; }
+  .mini-grid.cols4{ grid-template-columns: repeat(4,1fr); }
+  .mini-stat{ background:#efece0; border-radius:6px; padding:9px 4px; text-align:center; }
+  .mini-stat .num{ font-family:'Roboto Mono', monospace; font-weight:700; font-size:1.05rem; display:block; }
+  .mini-stat .lbl{ font-size:0.66rem; color:#5c6650; margin-top:3px; display:block; line-height:1.25; }
+  .mini-stat.win .num{ color:var(--win); }
+  .mini-stat.loss .num{ color:var(--loss); }
+  .mini-stat.draw .num{ color:var(--draw); }
+  .mode-streaks{ display:grid; gap:6px; margin-top:4px; }
+  .mode-streaks .streak-row{ padding:9px 12px; }
+  .mode-streaks .streak-row .lbl{ font-size:0.78rem; }
+  .mode-streaks .streak-row .num{ font-size:1rem; }
+
+  .opening-card{ border:1px solid var(--line); border-radius:8px; padding:16px 14px; margin-bottom:14px; background:#faf9f2; }
+  .opening-card h3{ margin:0 0 12px; font-size:1.02rem; font-weight:800; display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .opening-card h3 .oname{ display:flex; gap:6px; align-items:baseline; }
+  .opening-card h3 .rank{ font-family:'Roboto Mono', monospace; font-weight:700; color:var(--gold); font-size:0.95rem; }
+  .opening-card h3 .total{ font-family:'Roboto Mono', monospace; font-size:0.75rem; color:#8b8770; font-weight:600; }
+  .opening-mistake{ margin-top:10px; background:#efece0; border-radius:6px; padding:10px 12px; }
+  .opening-mistake .om-top{ display:flex; justify-content:space-between; align-items:center; font-size:0.78rem; color:#5c6650; gap:8px; }
+  .opening-mistake .phase-badge{ font-family:'Roboto Mono', monospace; font-weight:700; font-size:0.8rem; padding:3px 10px; border-radius:12px; background:var(--loss); color:#fff; white-space:nowrap; }
+  .opening-mistake .om-detail{ font-size:0.7rem; color:#8b8770; margin-top:6px; line-height:1.5; }
+
+
+  .engine-panel{ display:none; border:2px solid var(--ink); border-radius:8px; padding:16px 14px; margin-top:18px; background:#faf9f2; }
+  .engine-panel.show{ display:block; animation: rise 0.35s ease; }
+  .engine-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .engine-head h2{ margin:0 0 5px; font-size:1.05rem; }
+  .engine-head p{ margin:0; color:#5c6650; font-size:0.76rem; line-height:1.55; }
+  #engineBtn{ white-space:nowrap; padding:9px 13px; font-size:0.85rem; }
+  .engine-state{ min-height:18px; margin-top:10px; font-size:0.78rem; color:#5c6650; line-height:1.5; }
+  .engine-summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px; }
+  .engine-stat{ background:#efece0; border-radius:6px; padding:10px 6px; text-align:center; }
+  .engine-stat .num{ display:block; font-family:'Roboto Mono',monospace; font-weight:700; font-size:1.05rem; }
+  .engine-stat .lbl{ display:block; font-size:0.64rem; color:#5c6650; margin-top:3px; line-height:1.2; }
+  .engine-stat.blunder .num{ color:var(--loss); }
+  .engine-stat.mistake .num{ color:#8b5b26; }
+  .engine-phase{ display:grid; gap:6px; margin-top:10px; }
+  .engine-phase-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:#efece0; border-radius:6px; font-size:0.76rem; }
+  .engine-phase-row .tag{ font-weight:700; }
+  .engine-errors{ margin-top:12px; border-top:1px solid var(--line); padding-top:12px; }
+  .engine-errors-title{ font-size:0.82rem; font-weight:800; margin-bottom:7px; }
+  .engine-error{ background:#efece0; border-radius:6px; padding:9px 10px; margin-bottom:6px; font-size:0.72rem; line-height:1.55; }
+  .engine-error strong{ font-family:'Roboto Mono',monospace; }
+  .engine-badge{ display:inline-block; border-radius:10px; padding:2px 8px; margin-inline-start:4px; color:#fff; background:var(--loss); font-size:0.65rem; font-weight:700; }
+  @media(max-width:460px){ .engine-head{ flex-direction:column; } .engine-head button{ width:100%; } .engine-summary{ grid-template-columns:repeat(2,1fr); } }
+  .footer-note{ margin-top: 22px; font-size:0.76rem; color:#8b8770; line-height:1.6; }
+  .progress{ font-size:0.8rem; color:#5c6650; margin-top:6px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="top-row">
+    <svg class="pawn" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="6" r="3.2" fill="#1f2419"/>
+      <path d="M8.5 12c0-1.9 1.6-3.4 3.5-3.4s3.5 1.5 3.5 3.4c0 1.3-.7 2.4-1.8 3l1.3 4.3H8.5l1.3-4.3c-1.1-.6-1.8-1.7-1.8-3z" fill="#1f2419"/>
+      <rect x="6.5" y="19.6" width="11" height="2.4" rx="0.6" fill="#1f2419"/>
+    </svg>
+    <h1>إحصائيات Chess.com</h1>
+  </div>
+  <p class="sub">أدخل اسم المستخدم لعرض التصنيفات، الإجماليات، وأطول السلاسل المتتالية.</p>
+
+  <form id="searchForm">
+    <input type="text" id="usernameInput" placeholder="اسم المستخدم أو رابط الملف الشخصي" autocomplete="off">
+    <button type="submit" id="searchBtn">احسب</button>
+  </form>
+
+  <div class="state" id="stateMsg"></div>
+  <div class="progress" id="progressMsg"></div>
+
+  <div class="result" id="result">
+
+    <div class="section-title">الإجمالي الكلي</div>
+    <div class="cards-grid">
+      <div class="stat-card"><span class="num" id="totalGames">0</span><span class="lbl">مجموع المباريات</span></div>
+      <div class="stat-card win"><span class="num" id="totalWins">0</span><span class="lbl">مجموع الفوز</span></div>
+      <div class="stat-card loss"><span class="num" id="totalLosses">0</span><span class="lbl">مجموع الخسارة</span></div>
+      <div class="stat-card draw"><span class="num" id="totalDraws">0</span><span class="lbl">مجموع التعادل</span></div>
+    </div>
+
+    <div class="section-title">التفاصيل حسب نوع اللعب</div>
+    <div id="modeCards"></div>
+
+    <div class="section-title">أكثر 5 افتتاحيات لعبًا</div>
+    <div id="openingCards"></div>
+  </div>
+
+  <div class="engine-panel">
+      <div class="engine-head">
+        <div>
+          <h2>تحليل الخسائر بالمحرك</h2>
+          <p>Stockfish 18 يحلل النقلات في مباريات الخسارة ويحدد أكبر هبوط في التقييم، ثم يحدد هل الخطأ وقع في الافتتاح أو وسط اللعبة أو النهاية.</p>
+        </div>
+        <button type="button" id="engineBtn">حلّل الخسائر</button>
+      </div>
+      <div class="engine-state" id="engineState"></div>
+      <div id="engineResult" style="display:none"></div>
+    </div>
+    <p class="footer-note">التصنيفات والإجماليات تُجلب من واجهة Chess.com العامة مباشرة. تحليل المحرك يعمل داخل المتصفح باستخدام Stockfish 18 عبر خادم تحليل مخصص، لذلك لا يحتاج المتصفح إلى تنزيل ملف محرك خارجي قد يُرفض بـ403. وسيتم تحليل جميع الخسائر القابلة للتحليل، وقد يستغرق ذلك وقتًا طويلًا إذا كان الحساب يحتوي على عدد كبير من المباريات.</p>
+</div>
+
+<script>
+const form = document.getElementById('searchForm');
+const input = document.getElementById('usernameInput');
+const btn = document.getElementById('searchBtn');
+const stateMsg = document.getElementById('stateMsg');
+const progressMsg = document.getElementById('progressMsg');
+const result = document.getElementById('result');
+
+const MODES = [
+  { key: 'chess_bullet', tclass: 'bullet', label: 'بوليت' },
+  { key: 'chess_blitz', tclass: 'blitz', label: 'بلِتز' },
+  { key: 'chess_rapid', tclass: 'rapid', label: 'سريع' },
+  { key: 'chess_daily', tclass: 'daily', label: 'يومي' },
+];
+
+function classifyResult(res) {
+  if (res === 'win') return 'win';
+  const drawResults = ['agreed','repetition','stalemate','insufficient','50move','timevsinsufficient','draw'];
+  if (drawResults.includes(res)) return 'draw';
+  return 'loss';
+}
+
+function extractOpeningName(g) {
+  let src = g.eco || '';
+  if (!src && g.pgn) {
+    const m = g.pgn.match(/\[ECOUrl\s+"([^"]+)"\]/);
+    if (m) src = m[1];
+  }
+  if (!src) return null;
+  try {
+    const path = decodeURIComponent(new URL(src).pathname);
+    const seg = path.split('/').filter(Boolean).pop() || '';
+    const tokens = seg.split('-').filter(Boolean);
+    const nameTokens = [];
+    for (const t of tokens) {
+      if (/^\d/.test(t)) break;
+      nameTokens.push(t);
+    }
+    const name = (nameTokens.length ? nameTokens : tokens).join(' ').trim();
+    return name || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function movesCountFromPgn(pgn) {
+  if (!pgn) return null;
+  const matches = pgn.match(/(\d+)\./g);
+  if (!matches || !matches.length) return null;
+  let max = 0;
+  matches.forEach(m => {
+    const n = parseInt(m, 10);
+    if (!isNaN(n) && n > max) max = n;
+  });
+  return max || null;
+}
+
+function classifyPhase(moveCount) {
+  if (!moveCount) return null;
+  if (moveCount <= 10) return 'opening';
+  if (moveCount <= 25) return 'middle';
+  return 'endgame';
+}
+
+function classifyBoardPhase(fen, ply) {
+  if (!fen) return null;
+  const board = fen.split(' ')[0];
+  const pieces = board.replace(/[^QRBNqrbn]/g, '').length;
+  const queens = (board.match(/Q/g)||[]).length + (board.match(/q/g)||[]).length;
+  const rooks = (board.match(/R/g)||[]).length + (board.match(/r/g)||[]).length;
+  const minors = (board.match(/[BNbn]/g)||[]).length;
+  if (pieces <= 6 || (queens === 0 && pieces <= 8 && rooks <= 2)) return 'endgame';
+  if (ply <= 20 && queens >= 1 && pieces >= 10) return 'opening';
+  return 'middle';
+}
+
+function formatEval(cp, mate) {
+  if (mate !== null && mate !== undefined) return `M${Math.abs(mate)}${mate > 0 ? '+' : '-'}`;
+  const v = (cp || 0) / 100;
+  return (v > 0 ? '+' : '') + v.toFixed(2);
+}
+
+function scoreToNumber(info) {
+  if (info.mate !== null && info.mate !== undefined) return info.mate > 0 ? 100000 - info.mate : -100000 - info.mate;
+  return info.cp || 0;
+}
+
+function parseStockfishInfo(line) {
+  const m = line.match(/info .*?score (cp (-?\d+)|mate (-?\d+))/);
+  if (!m) return null;
+  return { cp: m[2] !== undefined ? parseInt(m[2],10) : null, mate: m[3] !== undefined ? parseInt(m[3],10) : null };
+}
+
+let engineMode = 'remote';
+const engineCache = new Map();
+
+function parseRemoteEval(data) {
+  if (!data || typeof data !== 'object') return null;
+
+  let cp = null;
+  if (typeof data.centipawns === 'number' && Number.isFinite(data.centipawns)) {
+    cp = Math.round(data.centipawns);
+  } else if (typeof data.centipawns === 'string' && data.centipawns.trim() !== '' && Number.isFinite(Number(data.centipawns))) {
+    cp = Math.round(Number(data.centipawns));
+  } else if (typeof data.eval === 'number' && Number.isFinite(data.eval)) {
+    cp = Math.round(data.eval * 100);
+  } else if (typeof data.evaluation === 'number' && Number.isFinite(data.evaluation)) {
+    cp = Math.round(data.evaluation * 100);
+  }
+
+  const mate = (data.mate === null || data.mate === undefined || data.mate === '') ? null : Number(data.mate);
+  if (cp === null && !Number.isFinite(mate)) return null;
+
+  const move = typeof data.move === 'string' ? data.move : (typeof data.bestmove === 'string' ? data.bestmove : null);
+  return {
+    cp: cp === null ? 0 : cp,
+    mate: Number.isFinite(mate) ? mate : null,
+    bestmove: move,
+    san: typeof data.san === 'string' ? data.san : null,
+    depth: Number(data.depth) || null,
+    text: typeof data.text === 'string' ? data.text : ''
+  };
+}
+
+async function stockfishRemoteSearch(fen, depth=18, searchmoves=null) {
+  const moveKey = searchmoves || '';
+  const key = `${fen}|${depth}|${moveKey}`;
+  if (engineCache.has(key)) return engineCache.get(key);
+
+  // طلبات المحرك تُنفَّذ بالتتابع مع إعادة محاولة تدريجية، حتى لا يؤدي
+  // Rate Limit أو تعثر طلب منفرد إلى إسقاط تحليل الحساب كاملًا.
+  let lastError = null;
+  for (let attempt=0; attempt<5; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const payload = {
+        fen,
+        variants: 1,
+        depth: Math.min(Math.max(depth, 16), 18),
+        // وقت تفكير أطول من الإعداد القديم لنتيجة أكثر ثباتًا.
+        maxThinkingTime: 600
+      };
+      if (searchmoves) payload.searchmoves = searchmoves;
+
+      const response = await fetch('https://chess-api.com/v1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+
+      if (response.status === 429) {
+        lastError = new Error('RATE_LIMIT');
+        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+        continue;
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const data = await response.json();
+      const parsed = parseRemoteEval(data);
+      if (!parsed) throw new Error('EMPTY_ENGINE_RESULT');
+      engineCache.set(key, parsed);
+      return parsed;
+    } catch (err) {
+      lastError = err;
+      if (err?.name === 'AbortError') continue;
+      if (err?.message === 'RATE_LIMIT') continue;
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError || new Error('تعذر الحصول على تقييم من Stockfish.');
+}
+
+async function getStockfishWorker() {
+  engineMode = 'remote';
+  return { remote: true };
+}
+
+async function engineSearch(fen, depth=14, searchmoves=null) {
+  return stockfishRemoteSearch(fen, depth, searchmoves);
+}
+
+function uciToSanFromHistory(chess, uci) {
+  if (!uci) return '—';
+  try {
+    if (!chess || !/^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(uci)) return uci;
+    const clone = new Chess();
+    clone.load(chess.fen());
+    const from = uci.slice(0,2), to = uci.slice(2,4), promotion = uci.slice(4,5).toLowerCase();
+    const move = clone.move({from, to, ...(promotion ? {promotion} : {})});
+    return move?.san || uci;
+  } catch (_) { return uci; }
+}
+
+function playerScoreFromWhiteScore(info, playerColor) {
+  const whiteScore = scoreToNumber(info);
+  return playerColor === 'w' ? whiteScore : -whiteScore;
+}
+
+function describeEngineError(cpl, bestForPlayer, actualForPlayer) {
+  if (actualForPlayer <= -200 && bestForPlayer >= 50) {
+    return 'هذه النقلة قلبت التقييم إلى أفضلية واضحة للخصم؛ المحرك يرى أن الوضع قبلها كان قابلًا للعب.';
+  }
+  if (cpl >= 300) return 'خطأ فادح: فقدان تقييمي كبير جدًا مقارنة بأفضل نقلة متاحة.';
+  if (cpl >= 150) return 'خطأ كبير: النقلة أعطت الخصم أفضلية قوية مقارنة باختيار المحرك.';
+  return 'عدم دقة: خسارة ملموسة في التقييم مقارنة بأفضل نقلة.';
+}
+
+function classifyEngineError(cpl) {
+  if (cpl >= 300) return 'blunder';
+  if (cpl >= 150) return 'mistake';
+  return 'inaccuracy';
+}
+
+async function analyzeGameWithEngine(game, username, depth=18) {
+  if (!game.pgn) return null;
+  let chess;
+  try {
+    chess = new Chess();
+    if (!chess.loadPgn(game.pgn, {sloppy:true})) return null;
+  } catch (_) { return null; }
+
+  let moves;
+  try { moves = chess.history({verbose:true}); } catch (_) { return null; }
+  if (!moves.length) return null;
+
+  const isWhite = game.white && game.white.username && game.white.username.toLowerCase() === username;
+  const playerColor = isWhite ? 'w' : 'b';
+  const errors = [];
+  let analyzedPlayerMoves = 0;
+  let failedPlayerMoves = 0;
+
+  for (let i=0; i<moves.length; i++) {
+    const m = moves[i];
+    if (m.color !== playerColor) continue;
+    analyzedPlayerMoves++;
+
+    const actualUci = `${m.from}${m.to}${m.promotion || ''}`;
+    try {
+      // نقيم أفضل نقلة من الوضع قبل نقلة اللاعب، ثم نقيم نفس النقلة
+      // التي لعبها اللاعب فعليًا عبر searchmoves. بهذه الطريقة نحسب CPL
+      // من نفس وضعية البداية وبنفس عمق المحرك، بدل الاعتماد على تخمينات.
+      const bestInfo = await engineSearch(m.before, depth);
+      const actualInfo = await engineSearch(m.before, depth, actualUci);
+      if (!bestInfo || !actualInfo) { failedPlayerMoves++; continue; }
+
+      const bestForPlayer = playerScoreFromWhiteScore(bestInfo, playerColor);
+      const actualForPlayer = playerScoreFromWhiteScore(actualInfo, playerColor);
+      const cpl = Math.max(0, Math.round(bestForPlayer - actualForPlayer));
+      const phase = classifyBoardPhase(m.after, m.ply || (i+1));
+      const bestmove = bestInfo.bestmove;
+
+      // لا نعرض الأخطاء الصغيرة جدًا. عتبة 80cp تعني خسارة 0.80 بيدق
+      // تقريبًا من منظور التقييم، مع إبقاء أكبر خطأ لتحديد نقطة التحول.
+      if (cpl >= 80) {
+        errors.push({
+          san: m.san,
+          actualUci,
+          cpl,
+          phase,
+          ply: m.ply || (i+1),
+          bestmove,
+          bestSan: bestInfo.san || uciToSanFromHistory(chess, bestmove),
+          before: bestInfo,
+          after: actualInfo,
+          bestForPlayer,
+          actualForPlayer,
+          reason: describeEngineError(cpl, bestForPlayer, actualForPlayer),
+          decisive: cpl >= 150 && actualForPlayer <= -100
+        });
+      }
+    } catch (_) {
+      // فشل تحليل نقلة واحدة لا يوقف بقية المباراة.
+      failedPlayerMoves++;
+    }
+  }
+
+  errors.sort((a,b)=>b.cpl-a.cpl);
+  const decisive = errors.filter(e => e.decisive).sort((a,b)=>b.cpl-a.cpl);
+  return {
+    errors,
+    biggest: errors[0] || null,
+    turningPoint: decisive[0] || errors[0] || null,
+    moves: moves.length,
+    analyzedPlayerMoves,
+    failedPlayerMoves
+  };
+}
+
+
+document.getElementById('engineBtn').addEventListener('click', async () => {
+  if (!window.__lastGames || !window.__lastUsername) {
+    document.getElementById('engineState').textContent = 'أولاً احسب إحصائيات الحساب، ثم شغّل تحليل المحرك.';
+    return;
+  }
+
+  const state = document.getElementById('engineState');
+  const btn = document.getElementById('engineBtn');
+  const out = document.getElementById('engineResult');
+  // نحدد اللاعب بدقة من اللونين، ثم نختار الخسائر فقط. لا نعتمد على
+  // كون اللاعب أبيض/أسود بشكل افتراضي حتى لا تتحول مباراة اللاعب بالأسود
+  // إلى مباراة غير قابلة للتعرف عليها بسبب اختلاف حالة الأحرف.
+  const playerGames = window.__lastGames.filter(g => {
+    const whiteName = String(g?.white?.username || '').trim().toLowerCase();
+    const blackName = String(g?.black?.username || '').trim().toLowerCase();
+    return whiteName === window.__lastUsername || blackName === window.__lastUsername;
+  });
+  const losses = playerGames.filter(g => {
+    const whiteName = String(g?.white?.username || '').trim().toLowerCase();
+    const side = whiteName === window.__lastUsername ? g.white : g.black;
+    return side && classifyResult(side.result) === 'loss';
+  });
+  const lossesWithPgn = losses.filter(g => typeof g.pgn === 'string' && g.pgn.trim());
+
+  if (!losses.length) {
+    state.textContent = `لم يتم العثور على خسائر ضمن ${playerGames.length} مباراة محمّلة.`;
+    out.style.display='none';
+    return;
+  }
+  if (!lossesWithPgn.length) {
+    state.textContent = `تم العثور على ${losses.length} خسارة، لكن بيانات PGN غير موجودة في أرشيف Chess.com؛ لذلك لا يمكن للمحرك تحليل النقلات.`;
+    out.style.display='none';
+    return;
+  }
+
+  btn.disabled = true;
+  out.style.display='block';
+  state.textContent = 'جاري تحليل النقلات الفعلية بالمحرك…';
+
+  const phaseAgg = {opening:0,middle:0,endgame:0};
+  const levelAgg = {blunder:0,mistake:0,inaccuracy:0};
+  const results = [];
+  const gameReports = [];
+  const maxGames = lossesWithPgn.length;
+  let analyzedGames = 0;
+
+  try {
+    await getStockfishWorker();
+
+    for (let i=0; i<maxGames; i++) {
+      state.textContent = `تحليل المباراة ${i+1} من ${maxGames} — فحص النقلات التي لعبها الحساب فعليًا`;
+      const r = await analyzeGameWithEngine(lossesWithPgn[i], window.__lastUsername, 18);
+      if (!r) continue;
+      analyzedGames++;
+
+      const game = lossesWithPgn[i];
+      const opening = extractOpeningName(game);
+      const report = {
+        game,
+        opening,
+        moves: r.moves,
+        analyzedPlayerMoves: r.analyzedPlayerMoves,
+        errors: r.errors,
+        turningPoint: r.turningPoint
+      };
+      gameReports.push(report);
+
+      r.errors.forEach(e => {
+        if (e.phase) phaseAgg[e.phase]++;
+        levelAgg[classifyEngineError(e.cpl)]++;
+        results.push({...e, game, opening});
+      });
+    }
+
+    results.sort((a,b)=>b.cpl-a.cpl);
+    const phaseTotal = Object.values(phaseAgg).reduce((a,b)=>a+b,0);
+    const matchedCauseGames = gameReports.filter(g => g.turningPoint);
+    const noErrorGames = gameReports.filter(g => !g.turningPoint);
+    const phaseLabels = {opening:'الافتتاح', middle:'وسط اللعبة', endgame:'النهاية'};
+
+    out.innerHTML = `
+      <div class="engine-summary">
+        <div class="engine-stat"><span class="num">${analyzedGames}</span><span class="lbl">مباريات خُصص لها تحليل</span></div>
+        <div class="engine-stat blunder"><span class="num">${levelAgg.blunder}</span><span class="lbl">أخطاء فادحة</span></div>
+        <div class="engine-stat mistake"><span class="num">${levelAgg.mistake}</span><span class="lbl">أخطاء كبيرة</span></div>
+        <div class="engine-stat"><span class="num">${results.length ? results[0].cpl : 0} cp</span><span class="lbl">أكبر فقدان تقييمي</span></div>
+      </div>
+
+      <div class="engine-phase">
+        ${Object.entries(phaseLabels).map(([k,label])=>{
+          const v = phaseAgg[k];
+          const pct = phaseTotal ? Math.round(v/phaseTotal*100) : 0;
+          return `<div class="engine-phase-row"><span class="tag">${label}</span><span>${v} خطأ مؤثر (${pct}%)</span></div>`;
+        }).join('')}
+      </div>
+
+      <div class="engine-errors">
+        <div class="engine-errors-title">نقطة التحول في كل خسارة</div>
+        ${matchedCauseGames.map((g,i)=>{
+          const x = g.turningPoint;
+          const moveNo = x.ply ? Math.ceil(x.ply/2) : '?';
+          const suffix = (g.game.white.username || '').toLowerCase() === window.__lastUsername ? '.' : '...';
+          const level = x.cpl >= 300 ? 'خطأ فادح' : x.cpl >= 150 ? 'خطأ كبير' : 'عدم دقة';
+          const beforeEval = formatEval(x.bestForPlayer, null);
+          const afterEval = formatEval(x.actualForPlayer, null);
+          return `<div class="engine-error game-cause">
+            <div><strong>${i+1}. ${g.game.white.username} × ${g.game.black.username}</strong></div>
+            <div>النقلة <strong>${moveNo}${suffix} ${x.san}</strong> — <span class="engine-badge">${level}</span> — فقدان <strong>${x.cpl} cp</strong></div>
+            <div>قبل اختيار النقلة: <strong>${beforeEval}</strong> للاعب · بعدها: <strong>${afterEval}</strong> للاعب</div>
+            <div>الأفضل للمحرك: <strong>${x.bestSan || x.bestmove || 'غير متاح'}</strong></div>
+            <div>${x.reason}</div>
+          </div>`;
+        }).join('') || '<div class="engine-error">لم يجد المحرك نقطة تحول واضحة ضمن عتبة 80 cp في المباريات المفحوصة.</div>'}
+      </div>
+
+      <div class="engine-errors">
+        <div class="engine-errors-title">أكبر الأخطاء عبر جميع الخسائر</div>
+        ${results.slice(0,15).map((x,i)=>{
+          const moveNo = x.ply ? Math.ceil(x.ply/2) : '?';
+          const suffix = (x.game.white.username || '').toLowerCase() === window.__lastUsername ? '.' : '...';
+          const level = x.cpl >= 300 ? 'خطأ فادح' : x.cpl >= 150 ? 'خطأ كبير' : 'عدم دقة';
+          return `<div class="engine-error">
+            <strong>#${i+1}</strong> ${x.game.white.username} × ${x.game.black.username}<br>
+            النقلة <strong>${moveNo}${suffix} ${x.san}</strong> — <span class="engine-badge">${level}</span> فقدان <strong>${x.cpl} cp</strong> — ${phaseLabels[x.phase] || 'غير محدد'}<br>
+            أفضل نقلة: <strong>${x.bestSan || x.bestmove || 'غير متاح'}</strong><br>
+            ${x.reason}
+          </div>`;
+        }).join('') || '<div class="engine-error">لم يجد المحرك أخطاء مؤثرة فوق 80 cp.</div>'}
+      </div>
+
+      <div class="engine-errors">
+        <div class="engine-errors-title">الخسائر التي لم يظهر فيها خطأ حاسم</div>
+        ${noErrorGames.slice(0,20).map(g=>`<div class="engine-error">${g.game.white.username} × ${g.game.black.username} — فُحصت ${g.analyzedPlayerMoves} نقلة للحساب، ولم يظهر فقدان واضح فوق 80 cp.</div>`).join('') || '<div class="engine-error">كل المباريات التي حُللت احتوت على نقطة تحول مؤثرة.</div>'}
+      </div>`;
+
+    const failedMovesTotal = gameReports.reduce((sum,g)=>sum + (g.failedPlayerMoves || 0), 0);
+    state.textContent = `اكتمل تحليل الخسائر: فُحصت ${analyzedGames} مباراة، وحُللت ${gameReports.reduce((sum,g)=>sum + g.analyzedPlayerMoves,0)} نقلة للاعب بالمحرك (عمق 18).${failedMovesTotal ? ` تعذر تقييم ${failedMovesTotal} نقلة منفردة وتم تجاوزها دون إيقاف التحليل.` : ''} تم تحديد ${matchedCauseGames.length} خسارة لها نقطة تحول واضحة.`;
+
+    if (window.__top5Openings) {
+      window.__top5Openings.forEach((o, idx) => {
+        const badge = document.getElementById(`phase-badge-${idx}`);
+        const detail = document.getElementById(`phase-detail-${idx}`);
+        if (!badge || !detail) return;
+        if (o.loss === 0) return;
+
+        const openingResults = gameReports.filter(x => x.opening === o.name && x.turningPoint);
+        if (!openingResults.length) {
+          badge.textContent = '—';
+          detail.textContent = 'لا توجد نقطة تحول محرك مؤكدة لهذه الافتتاحية ضمن المباريات المحللة';
+          return;
+        }
+        const lp = {opening:0,middle:0,endgame:0};
+        openingResults.forEach(x => { if (x.turningPoint?.phase) lp[x.turningPoint.phase]++; });
+        const entries = Object.entries(lp).sort((a,b)=>b[1]-a[1]);
+        const total = openingResults.length;
+        const dominant = entries[0];
+        badge.textContent = phaseLabels[dominant[0]];
+        detail.textContent = `${dominant[1]} من ${total} خسارة لها نقطة تحول واضحة في ${phaseLabels[dominant[0]]}`;
+      });
+    }
+  } catch (err) {
+    out.style.display='none';
+    state.textContent = err.message || 'تعذر تشغيل التحليل الحقيقي بالمحرك.';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = input.value.trim();
+  if (!username) return;
+
+  btn.disabled = true;
+  result.classList.remove('show');
+  progressMsg.textContent = '';
+  stateMsg.className = 'state loading';
+  stateMsg.textContent = 'جارٍ جلب التصنيفات...';
+
+  try {
+    let raw = username.trim();
+    // دعم روابط الملف الشخصي مثل https://www.chess.com/member/m_87s
+    const urlMatch = raw.match(/chess\.com\/(?:member|players)\/([^\/?#]+)/i);
+    if (urlMatch) raw = urlMatch[1];
+    const cleanName = raw.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
+    if (!cleanName) throw new Error('اسم المستخدم أو الرابط غير صالح.');
+
+    // تحقق من وجود الحساب أولاً (بدون الاعتماد على /stats، لأنه يغطي المباريات المصنّفة فقط)
+    let profileExists = false;
+    try {
+      const profRes = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(cleanName)}`);
+      profileExists = profRes.ok;
+    } catch (_) {}
+    if (!profileExists) {
+      throw new Error(`لا يوجد مستخدم بهذا الاسم على Chess.com (تم البحث عن: "${cleanName}"). تأكد من كتابة الاسم بحروف/أرقام إنجليزية فقط بدون مسافات.`);
+    }
+
+    stateMsg.className = 'state loading';
+    stateMsg.textContent = 'جارٍ تحميل أرشيف المباريات...';
+
+    const archRes = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(cleanName)}/games/archives`);
+    if (!archRes.ok) throw new Error('تعذر جلب أرشيف المباريات.');
+    const archData = await archRes.json();
+    const archives = archData.archives || [];
+
+    // نبني كل الإحصائيات (لكل تصنيف/نوع لعب) مباشرة من أرشيف المباريات الفعلي،
+    // بدل الاعتماد على /stats اللي بيغطي المباريات المصنّفة (rated) بس.
+    // بهذا الشكل أي نوع لعب فيه مباريات (بوليت/بلِتز/سريع/يومي، مصنّفة أو ودّية) هيظهر.
+    const byClass = {}; // tclass -> { win, loss, draw, current, best, lowest }
+    const chronological = [];
+    const allGamesForEngine = [];
+    const openingStats = {}; // name -> { win, loss, draw }
+
+    for (let i = 0; i < archives.length; i++) {
+      progressMsg.textContent = `جارٍ تحليل الأرشيف: شهر ${i + 1} من ${archives.length}`;
+      const monthRes = await fetch(archives[i]);
+      if (!monthRes.ok) continue;
+      const monthData = await monthRes.json();
+      const games = monthData.games || [];
+      games.forEach(g => {
+        const isWhite = g.white && g.white.username && g.white.username.toLowerCase() === cleanName;
+        const isBlack = g.black && g.black.username && g.black.username.toLowerCase() === cleanName;
+        if (!isWhite && !isBlack) return;
+        const side = isWhite ? g.white : g.black;
+        const tclass = g.time_class;
+        if (!tclass) return;
+
+        if (!byClass[tclass]) byClass[tclass] = { win: 0, loss: 0, draw: 0, current: null, best: null, lowest: null };
+        const c = byClass[tclass];
+        const outcome = classifyResult(side.result);
+        if (outcome === 'win') c.win++; else if (outcome === 'draw') c.draw++; else c.loss++;
+
+        if (typeof side.rating === 'number') {
+          const end = g.end_time || 0;
+          if (c.current === null || end >= c._lastEnd) { c.current = side.rating; c._lastEnd = end; }
+          if (c.best === null || side.rating > c.best) c.best = side.rating;
+          if (c.lowest === null || side.rating < c.lowest) c.lowest = side.rating;
+        }
+
+        chronological.push({ end: g.end_time || 0, outcome, tclass });
+
+        const openingName = extractOpeningName(g);
+        if (openingName) {
+          if (!openingStats[openingName]) {
+            openingStats[openingName] = { win: 0, loss: 0, draw: 0 };
+          }
+          const os = openingStats[openingName];
+          if (outcome === 'win') os.win++; else if (outcome === 'draw') os.draw++; else os.loss++;
+        }
+
+        allGamesForEngine.push(g);
+      });
+    }
+    progressMsg.textContent = '';
+    window.__lastGames = allGamesForEngine;
+    window.__lastUsername = cleanName;
+
+    if (Object.keys(byClass).length === 0) {
+      throw new Error(`الحساب "${cleanName}" موجود على Chess.com، لكن لا توجد له أي مباريات مسجّلة في الأرشيف بعد.`);
+    }
+
+    // نبني قائمة التصنيفات المعروفة أولاً (بترتيب ثابت)، ثم أي تصنيف إضافي غير متوقع من الأرشيف
+    const knownKeys = new Set(MODES.map(m => m.tclass));
+    const extraModes = Object.keys(byClass)
+      .filter(k => !knownKeys.has(k))
+      .map(k => ({ tclass: k, label: k }));
+    const allModeDefs = [...MODES.map(m => ({ tclass: m.tclass, label: m.label })), ...extraModes];
+
+    let totalGames = 0, totalWins = 0, totalLosses = 0, totalDraws = 0;
+    const modeRows = allModeDefs.map(m => {
+      const c = byClass[m.tclass];
+      if (!c) return { ...m, current: '—', best: '—', lowest: '—', games: 0, win: 0, loss: 0, draw: 0 };
+      const games = c.win + c.loss + c.draw;
+      totalGames += games;
+      totalWins += c.win;
+      totalLosses += c.loss;
+      totalDraws += c.draw;
+      return {
+        ...m,
+        current: c.current === null ? '—' : c.current,
+        best: c.best === null ? '—' : c.best,
+        lowest: c.lowest === null ? '—' : c.lowest,
+        games, win: c.win, loss: c.loss, draw: c.draw,
+      };
+    });
+
+    document.getElementById('totalGames').textContent = totalGames.toLocaleString('en-US');
+    document.getElementById('totalWins').textContent = totalWins.toLocaleString('en-US');
+    document.getElementById('totalLosses').textContent = totalLosses.toLocaleString('en-US');
+    document.getElementById('totalDraws').textContent = totalDraws.toLocaleString('en-US');
+
+    chronological.sort((a, b) => a.end - b.end);
+
+    function computeStreaks(list) {
+      let curWin = 0, maxWin = 0;
+      let curNoLoss = 0, maxNoLoss = 0;
+      let curLoss = 0, maxLoss = 0;
+      list.forEach(g => {
+        if (g.outcome === 'win') { curWin++; curNoLoss++; curLoss = 0; }
+        else if (g.outcome === 'draw') { curWin = 0; curNoLoss++; curLoss = 0; }
+        else { curWin = 0; curNoLoss = 0; curLoss++; }
+        maxWin = Math.max(maxWin, curWin);
+        maxNoLoss = Math.max(maxNoLoss, curNoLoss);
+        maxLoss = Math.max(maxLoss, curLoss);
+      });
+      return { maxWin, maxNoLoss, maxLoss };
+    }
+
+    const streaksByClass = {};
+    allModeDefs.forEach(m => {
+      streaksByClass[m.tclass] = computeStreaks(chronological.filter(g => g.tclass === m.tclass));
+    });
+
+    const playedModeRows = modeRows.filter(r => r.games > 0);
+
+    document.getElementById('modeCards').innerHTML = playedModeRows.map(r => {
+      const st = streaksByClass[r.tclass] || { maxWin: 0, maxNoLoss: 0, maxLoss: 0 };
+      return `
+      <div class="mode-card">
+        <h3><span class="dot"></span>${r.label}</h3>
+        <div class="mini-grid">
+          <div class="mini-stat"><span class="num">${r.current}</span><span class="lbl">تصنيف حالي</span></div>
+          <div class="mini-stat"><span class="num">${r.best}</span><span class="lbl">أعلى تصنيف</span></div>
+          <div class="mini-stat"><span class="num">${r.lowest === null ? '—' : r.lowest}</span><span class="lbl">أقل تصنيف</span></div>
+        </div>
+        <div class="mini-grid cols4">
+          <div class="mini-stat"><span class="num">${r.games.toLocaleString('en-US')}</span><span class="lbl">مجموع مباريات</span></div>
+          <div class="mini-stat win"><span class="num">${r.win.toLocaleString('en-US')}</span><span class="lbl">مجموع فوز</span></div>
+          <div class="mini-stat loss"><span class="num">${r.loss.toLocaleString('en-US')}</span><span class="lbl">مجموع خسارة</span></div>
+          <div class="mini-stat draw"><span class="num">${r.draw.toLocaleString('en-US')}</span><span class="lbl">مجموع تعادل</span></div>
+        </div>
+        <div class="mode-streaks">
+          <div class="streak-row"><span class="lbl">أطول سلسلة انتصارات متتالية</span><span class="num" style="color:var(--win);">${st.maxWin.toLocaleString('en-US')}</span></div>
+          <div class="streak-row"><span class="lbl">أطول سلسلة بلا خسارة</span><span class="num" style="color:var(--gold);">${st.maxNoLoss.toLocaleString('en-US')}</span></div>
+          <div class="streak-row"><span class="lbl">أطول سلسلة هزائم متتالية</span><span class="num" style="color:var(--loss);">${st.maxLoss.toLocaleString('en-US')}</span></div>
+        </div>
+      </div>
+    `;
+    }).join('') || '<p class="footer-note">لا توجد مباريات تصنيفية مسجّلة لهذا الحساب في أي نوع لعب.</p>';
+
+    const openingEntries = Object.entries(openingStats).map(([name, s]) => ({
+      name,
+      win: s.win, loss: s.loss, draw: s.draw,
+      total: s.win + s.loss + s.draw,
+    }));
+    openingEntries.sort((a, b) => b.total - a.total);
+    const top5Openings = openingEntries.slice(0, 5);
+    window.__top5Openings = top5Openings;
+
+    document.getElementById('openingCards').innerHTML = top5Openings.length ? top5Openings.map((o, idx) => {
+      let phaseName, detail;
+      if (o.loss === 0) {
+        phaseName = '—';
+        detail = 'لا توجد خسائر مسجّلة بهذه الافتتاحية';
+      } else {
+        phaseName = 'لم يُحلَّل بعد';
+        detail = 'اضغط "حلّل الخسائر" بالأسفل لعرض المرحلة الأكثر تسببًا بالخسارة في هذه الافتتاحية';
+      }
+      return `
+      <div class="opening-card">
+        <h3>
+          <span class="oname"><span class="rank">${idx + 1}.</span> ${o.name}</span>
+          <span class="total">${o.total.toLocaleString('en-US')} مباراة</span>
+        </h3>
+        <div class="mini-grid">
+          <div class="mini-stat win"><span class="num">${o.win.toLocaleString('en-US')}</span><span class="lbl">فوز</span></div>
+          <div class="mini-stat loss"><span class="num">${o.loss.toLocaleString('en-US')}</span><span class="lbl">خسارة</span></div>
+          <div class="mini-stat draw"><span class="num">${o.draw.toLocaleString('en-US')}</span><span class="lbl">تعادل</span></div>
+        </div>
+        <div class="opening-mistake">
+          <div class="om-top"><span>أكثر مرحلة تسبب الخسارة</span><span class="phase-badge" id="phase-badge-${idx}">${phaseName}</span></div>
+          <div class="om-detail" id="phase-detail-${idx}">${detail}</div>
+        </div>
+      </div>
+    `;
+    }).join('') : '<p class="footer-note">تعذّر تحديد الافتتاحيات لهذا الحساب (بيانات ECO غير متوفرة في الأرشيف).</p>';
+
+    stateMsg.className = 'state';
+    stateMsg.textContent = '';
+    result.classList.add('show');
+    document.querySelector('.engine-panel').classList.add('show');
+    document.getElementById('engineState').textContent = '';
+    document.getElementById('engineResult').style.display = 'none';
+    document.getElementById('engineResult').innerHTML = '';
+  } catch (err) {
+    stateMsg.className = 'state error';
+    stateMsg.textContent = err.message || 'حدث خطأ غير متوقع.';
+    progressMsg.textContent = '';
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/chess.min.js"></script>
+</body>
+</html>
